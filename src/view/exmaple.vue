@@ -1,6 +1,7 @@
 <template>
   <div class="example">
-    <waterfall v-slot:default="props" :lists="lists">
+    <waterfall :lists="lists" @scrolltoB="scrolltoB">
+      <template  v-slot:default="props">
       <div
         style="
           width: 100%;
@@ -12,7 +13,13 @@
         "
       >
         这是第 {{ props.index }}张图片
+
       </div>
+      </template>
+
+        <!-- <template v-slot:page>
+          4211212
+        </template> -->
     </waterfall>
   </div>
 </template>
@@ -35,10 +42,12 @@ export default {
         .then((res) => {
           if (this.group < 10) {
             this.lists = this.lists.concat(res.data)
-            this.group++
-            console.log('list', this.lists)
           }
         })
+    },
+    scrolltoB () {
+      this.group++
+      this.getLists()
     }
   },
   created () {
@@ -49,7 +58,6 @@ export default {
 <style scoped lang="less">
 .example {
   width: 100%;
-  padding: 10px;
   height: 600px;
   box-sizing: border-box;
 }
