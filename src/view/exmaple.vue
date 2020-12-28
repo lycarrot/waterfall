@@ -40,8 +40,10 @@ export default {
     getLists () {
       axios.get('./static/mock/data.json?group=' + this.group)
         .then((res) => {
-          if (this.group < 10) {
-            this.lists = this.lists.concat(res.data)
+          if (this.group < 3) {
+            setTimeout(() => {
+              this.lists = this.lists.concat(res.data)
+            }, 2000)
           }
         })
     },

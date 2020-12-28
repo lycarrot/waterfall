@@ -1,5 +1,15 @@
 <template>
+<div style="height:100%;">
   <div class="waterfall-wrapper" ref="wrap">
+    <div class="pull-to-refresh-layer">
+      <div v-show="!isShowLoading">
+        <!-- <i ref="icon" class="css-icon icon-upward"></i> -->
+        <p>下拉刷新</p>
+      </div>
+      <div v-show="isShowLoading" style="padding-top: 30px">
+        假装是个loading图标
+      </div>
+    </div>
     <ul class="waterfall-container">
       <li
         class="item"
@@ -22,10 +32,14 @@
         <div class="description" :style="{ width: colWidth + 'px' }">
           <slot :index="index"></slot>
         </div>
-
       </li>
     </ul>
+    <div class="footer" v-if="isBtLoading" :style="{ top: maxHeight + 'px' }">
+      {{ finished ? finishedText : loadingText }}
+    </div>
   </div>
+</div>
+
 </template>
 <script>
 
@@ -58,6 +72,18 @@ export default {
     distance: {
       type: Number,
       default: 15
+    },
+    finished: {
+      type: Boolean,
+      default: false
+    },
+    loadingText: {
+      type: String,
+      default: '加载中...'
+    },
+    finishedText: {
+      type: String,
+      default: '没有更多了'
     }
     //  当窗口变化时  1改变图片宽度  0保持图片宽度，改变列数量
     // resizeType: {
@@ -72,13 +98,18 @@ export default {
       loadedCount: 0,
       isResize: false,
       // 是否到底部加载数据中
-      isBtLoading: false
+      isBtLoading: false,
+      heightLists: [],
+      isShowLoading: false
     }
   },
   computed: {
     // showLists () {
     //   return this.lists.filter(item => !item.isError)
     // }
+    maxHeight () {
+      return Math.max.apply(null, this.heightLists)
+    },
     cols_n () {
       return this.isMobile() && this.cols === 5 ? 2 : this.cols
     }
@@ -127,7 +158,6 @@ export default {
             }
             item._preload = true
             if (this.loadedCount === this.lists.length || this.isResize) {
-              this.isBtLoading = false
               this.$emit('paint')
             }
           }
@@ -136,23 +166,26 @@ export default {
     },
     paint () {
       this.$nextTick(() => {
-        let arr = []
+        // let arr = []
+        this.heightLists = []
         for (let i = 0; i < this.lists.length; i++) {
           if (this.lists[i]._paint) return
           // 把第列第一个元素高度加入一个数组里面
           const item = this.$el.getElementsByClassName('item')[i]
           const itemHeight = item.offsetHeight
+
           if (i < this.cols_n) {
             this.lists[i].top = 0
             this.lists[i].left = i * this.colWidth + i * this.marginR
-            arr.push(itemHeight)
+            this.heightLists.push(itemHeight)
           } else {
-            let minColHeight = Math.min(...arr)
-            let minColIndex = arr.findIndex(item => item === minColHeight)
+            let minColHeight = Math.min(...this.heightLists)
+            let minColIndex = this.heightLists.findIndex(item => item === minColHeight)
             this.lists[i].top = minColHeight + this.marginB
             this.lists[i].left = minColIndex * this.colWidth + this.marginR * minColIndex
-            arr.splice(minColIndex, 1, minColHeight + itemHeight + this.marginB)
+            this.heightLists.splice(minColIndex, 1, minColHeight + itemHeight + this.marginB)
           }
+
           item.style.top = this.lists[i].top + 'px'
           item.style.left = this.lists[i].left + 'px'
           item._paint = true
@@ -174,13 +207,64 @@ export default {
         this.$emit('scrolltoB')
       }
     },
-    scrollToB () {
-
+    pull (el, callback) {
+      let beginPagY = 0
+      let currentPos
+      const maxTranslateY = 150
+      // const iconEl = this.$refs.icon
+      el.addEventListener('touchstart', e => {
+        if (el.scrollTop !== 0) {
+          return
+        }
+        beginPagY = e.touches[0].pageY
+        e.preventDefault()
+      })
+      el.addEventListener('touchmove', e => {
+        if (el.scrollTop !== 0) {
+          return
+        }
+        const pageY = e.touches[0].pageY
+        const distance = currentPos = pageY - beginPagY
+        if (distance < 0 || distance > maxTranslateY) {
+          // 上拉的时候不做任何处理
+          return
+        }
+        // if (distance > 60) {
+        //   iconEl.classList.add('active')
+        // } else {
+        //   iconEl.classList.remove('active')
+        // }
+        e.preventDefault()
+        el.style.transform = `translateY(${distance}px)`
+      })
+      // let clear = () => {
+      //   this.isShowLoading = false
+      //   el.style.transform = `translateY(0)`
+      //   setTimeout(() => {
+      //     el.style.transition = ``
+      //   }, 200)
+      // }
+      // el.addEventListener('touchend', () => {
+      //   el.style.transition = `.2s`
+      //   if (currentPos >= 60) {
+      //     this.isShowLoading = true
+      //     el.style.transform = `translateY(30px)`
+      //     callback && callback(() => {
+      //       clear()
+      //     })
+      //     return
+      //   }
+      //   clear()
+      // })
     }
+    // scrollToB () {
+
+    // }
   },
   watch: {
     lists (newval, oldval) {
       if (newval.length !== oldval.length) {
+        this.isBtLoading = false
         this.preLoad()
       }
     }
@@ -192,6 +276,11 @@ export default {
     })
     window.addEventListener('resize', this.resize)
     this.$refs.wrap.addEventListener('scroll', this.scroll)
+    this.pull(this.$refs.wrap, (done) => {
+      setTimeout(() => {
+        done()
+      }, 1000)
+    })
   }
 
 }
@@ -230,5 +319,62 @@ div {
   &::-webkit-scrollbar {
     display: none;
   }
+  .footer {
+    position: absolute;
+    width: 100%;
+    height: 40px;
+    line-height: 40px;
+    font-size: 16px;
+    text-align: center;
+    color: #969799;
+  }
+}
+.css-icon {
+  display: inline-block;
+  height: 1em;
+  width: 1em;
+  font-size: 20px;
+  box-sizing: border-box;
+  text-indent: -9999px;
+  vertical-align: middle;
+  position: relative;
+}
+.css-icon::before,
+.css-icon::after {
+  content: "";
+  box-sizing: inherit;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+}
+
+.icon-upward::before {
+  height: 0.65em;
+  width: 0.65em;
+  border-style: solid;
+  border-width: 2px 0 0 2px;
+  -ms-transform: translate(-50%, -50%) rotate(45deg);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.icon-upward::after {
+  height: 0.8em;
+  border-left: 2px solid;
+  top: 55%;
+}
+
+.icon-upward.active {
+  transform: rotate(180deg);
+  transition: transform 0.3s;
+}
+
+.pull-to-refresh-layer {
+  height: 60px;
+  margin-top: -60px;
+  font-size: 12px;
+  text-align: center;
+  color: #aaa;
+  line-height: 30px;
 }
 </style>
